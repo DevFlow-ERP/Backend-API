@@ -1,11 +1,11 @@
 """
-SQLAlchemy ®x
-®‡ ®xD Ï0– importXÏ Alembict x›`  àƒ] i»‰.
+SQLAlchemy Models
+Import all models here so Alembic can detect them.
 """
 
 from app.database import Base, TimestampMixin
 
-# ®x import
+# Import models
 from app.models.user import User
 from app.models.team import Team, TeamMember, TeamRole
 from app.models.project import Project, ProjectStatus
