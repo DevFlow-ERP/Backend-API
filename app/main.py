@@ -6,7 +6,7 @@ DevFlow ERP 백엔드 애플리케이션
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, projects, sprints, issues
+from app.api.v1 import auth, projects, sprints, issues, teams, members, servers, services, deployments
 from app.config import settings
 
 # FastAPI 앱 생성
@@ -62,6 +62,11 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(sprints.router, prefix="/api/v1")
 app.include_router(issues.router, prefix="/api/v1")
+app.include_router(teams.router, prefix="/api/v1")
+app.include_router(members.router, prefix="/api/v1")
+app.include_router(servers.router, prefix="/api/v1")
+app.include_router(services.router, prefix="/api/v1")
+app.include_router(deployments.router, prefix="/api/v1")
 
 
 # Root endpoint
