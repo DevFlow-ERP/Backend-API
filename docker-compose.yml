@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: devflow-postgres
+    environment:
+      POSTGRES_USER: devflow
+      POSTGRES_PASSWORD: devflow_password
+      POSTGRES_DB: devflow_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devflow-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: devflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - devflow-network
+
+  # Backend API (Development)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devflow-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://devflow:devflow_password@postgres:5432/devflow_erp
+      - REDIS_URL=redis://redis:6379/0
+      - AUTHENTIK_URL=${AUTHENTIK_URL}
+      - AUTHENTIK_TOKEN=${AUTHENTIK_TOKEN}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - devflow-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  devflow-network:
+    driver: bridge

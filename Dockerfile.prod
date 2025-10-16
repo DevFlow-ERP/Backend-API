@@ -1,0 +1,54 @@
+# Production Dockerfile for DevFlow ERP Backend with Gunicorn
+# Multi-stage build for optimized image size
+
+FROM python:3.13-slim as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install requirements
+COPY requirements.txt requirements.prod.txt ./
+RUN pip install --no-cache-dir --user -r requirements.prod.txt
+
+# Runtime stage
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 appuser
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Update PATH
+ENV PATH=/root/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Create necessary directories
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+
+# Switch to non-root user
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
+
+# Run with Gunicorn
+CMD ["sh", "-c", "alembic upgrade head && gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000 --access-logfile - --error-logfile - --log-level info"]
