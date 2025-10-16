@@ -1,6 +1,6 @@
 """
 Core module
-ÙH, xù, x Ò uÏ 0•D ıi»‰.
+Core functionality: authentication, security, exceptions
 """
 
 from app.core import auth, exceptions, security

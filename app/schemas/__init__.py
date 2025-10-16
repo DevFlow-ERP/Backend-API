@@ -1,6 +1,6 @@
 """
 Pydantic schemas package
-®‡ §§»| ÑÏ∏i»‰.
+Pydantic Schema Definitions
 """
 
 # Common schemas

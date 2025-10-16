@@ -1,6 +1,6 @@
 """
 Utils package
- ø¬ğ h| õiÈä.
+Utility functions
 """
 
 from app.utils.pagination import (
