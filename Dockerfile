@@ -47,5 +47,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run migrations and start server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Start server (without migrations - handled by init scripts)
+# If you need to run migrations, use: docker compose exec backend alembic upgrade head
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
