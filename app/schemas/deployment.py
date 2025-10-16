@@ -5,7 +5,7 @@ Deployment Pydantic schemas
 
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 from app.models.deployment import DeploymentType, DeploymentStatus
 from app.schemas.common import TimestampSchema
@@ -67,8 +67,8 @@ class DeploymentResponse(DeploymentBase, TimestampSchema):
     tag: Optional[str] = Field(default=None, description="Git 태그")
     type: DeploymentType = Field(description="배포 타입")
     status: DeploymentStatus = Field(description="배포 상태")
-    started_at: Optional[str] = Field(default=None, description="배포 시작 시간 (ISO 8601)")
-    completed_at: Optional[str] = Field(default=None, description="배포 완료 시간 (ISO 8601)")
+    started_at: Optional[datetime] = Field(default=None, description="배포 시작 시간 (ISO 8601)")
+    completed_at: Optional[datetime] = Field(default=None, description="배포 완료 시간 (ISO 8601)")
     rollback_from_id: Optional[int] = Field(default=None, description="롤백 대상 배포 ID")
     notes: Optional[str] = Field(default=None, description="배포 메모")
     error_message: Optional[str] = Field(default=None, description="에러 메시지")
@@ -77,6 +77,11 @@ class DeploymentResponse(DeploymentBase, TimestampSchema):
     # Nested objects
     service: Optional[ServiceListResponse] = Field(default=None, description="서비스 정보")
     deployed_by_user: Optional[UserListResponse] = Field(default=None, description="배포자 정보")
+
+    @field_serializer('started_at', 'completed_at')
+    def serialize_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        """Convert datetime to ISO 8601 string"""
+        return value.isoformat() if value else None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -87,14 +92,20 @@ class DeploymentListResponse(BaseModel):
     간소화된 배포 정보 목록입니다.
     """
     id: int = Field(description="배포 ID")
+    service_id: int = Field(description="서비스 ID")
     version: str = Field(description="배포 버전")
     environment: str = Field(description="배포 환경")
     type: DeploymentType = Field(description="배포 타입")
     status: DeploymentStatus = Field(description="배포 상태")
-    deployed_at: str = Field(description="배포일시 (created_at)")
+    deployed_at: datetime = Field(alias="created_at", description="배포일시 (created_at)")
     deployed_by_user: Optional[UserListResponse] = Field(default=None, description="배포자 정보")
 
-    model_config = ConfigDict(from_attributes=True)
+    @field_serializer('deployed_at')
+    def serialize_deployed_at(self, value: datetime) -> str:
+        """Convert datetime to ISO 8601 string"""
+        return value.isoformat()
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class DeploymentRollbackRequest(BaseModel):

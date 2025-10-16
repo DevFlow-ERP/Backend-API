@@ -55,7 +55,7 @@ class TestDeploymentAPI:
             "environment": "production",
             "type": "manual",
             "status": "pending",
-            "commit_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+            "commit_hash": "abc123def456789abc123def456789abc1234567",
             "branch": "main",
             "notes": "Test deployment",
         }
@@ -94,9 +94,9 @@ class TestDeploymentAPI:
         assert response.status_code == 200
 
         data = response.json()
-        assert "data" in data
+        assert "items" in data
         assert "meta" in data
-        assert len(data["data"]) == 2
+        assert len(data["items"]) == 2
 
     def test_get_deployment(self, authenticated_client: TestClient, db_session: Session):
         """Test getting a single deployment"""
@@ -152,7 +152,7 @@ class TestDeploymentAPI:
             environment="production",
             type=DeploymentType.MANUAL,
             status=DeploymentStatus.SUCCESS,
-            commit_hash="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+            commit_hash="abc123def456789abc123def456789abc1234567",
             branch="main",
         )
         db_session.add(target_deployment)
@@ -260,8 +260,8 @@ class TestDeploymentFiltering:
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data["data"]) == 1
-        assert data["data"][0]["service_id"] == self.service.id
+        assert len(data["items"]) == 1
+        assert data["items"][0]["service_id"] == self.service.id
 
     def test_filter_by_environment(self, authenticated_client: TestClient, db_session: Session):
         """Test filtering deployments by environment"""
@@ -288,8 +288,8 @@ class TestDeploymentFiltering:
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data["data"]) == 1
-        assert data["data"][0]["environment"] == "production"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["environment"] == "production"
 
     def test_list_successful_deployments(self, authenticated_client: TestClient, db_session: Session):
         """Test listing successful deployments"""
@@ -316,8 +316,8 @@ class TestDeploymentFiltering:
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data["data"]) == 1
-        assert data["data"][0]["status"] == "success"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["status"] == "success"
 
     def test_list_rollback_deployments(self, authenticated_client: TestClient, db_session: Session):
         """Test listing rollback deployments"""
@@ -348,5 +348,5 @@ class TestDeploymentFiltering:
         assert response.status_code == 200
 
         data = response.json()
-        assert len(data["data"]) == 1
-        assert data["data"][0]["type"] == "rollback"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["type"] == "rollback"

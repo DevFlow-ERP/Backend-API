@@ -82,21 +82,26 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         return db.query(self.model).offset(skip).limit(limit).all()
 
-    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
+    def create(self, db: Session, *, obj_in: CreateSchemaType | dict[str, Any]) -> ModelType:
         """
         새 레코드 생성
 
         Args:
             db: 데이터베이스 세션
-            obj_in: 생성할 데이터 (Pydantic 스키마)
+            obj_in: 생성할 데이터 (Pydantic 스키마 또는 dict)
 
         Returns:
             ModelType: 생성된 레코드
 
         Example:
             user = crud_user.create(db, obj_in=UserCreate(email="user@example.com"))
+            user = crud_user.create(db, obj_in={"email": "user@example.com"})
         """
-        obj_in_data = obj_in.model_dump()
+        if isinstance(obj_in, dict):
+            obj_in_data = obj_in
+        else:
+            obj_in_data = obj_in.model_dump()
+
         db_obj = self.model(**obj_in_data)
         db.add(db_obj)
         db.commit()

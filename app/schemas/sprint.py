@@ -5,7 +5,7 @@ Sprint Pydantic schemas
 
 from typing import Optional
 from datetime import date
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, field_serializer
 
 from app.models.sprint import SprintStatus
 from app.schemas.common import TimestampSchema
@@ -60,11 +60,16 @@ class SprintResponse(SprintBase, TimestampSchema):
     """
     id: int = Field(description="스프린트 ID")
     project_id: int = Field(description="프로젝트 ID")
-    start_date: Optional[str] = Field(default=None, description="시작일 (ISO 8601)")
-    end_date: Optional[str] = Field(default=None, description="종료일 (ISO 8601)")
+    start_date: Optional[date] = Field(default=None, description="시작일 (ISO 8601)")
+    end_date: Optional[date] = Field(default=None, description="종료일 (ISO 8601)")
     status: SprintStatus = Field(description="스프린트 상태")
     project: Optional[ProjectListResponse] = Field(default=None, description="프로젝트 정보")
     issue_count: Optional[int] = Field(default=None, description="이슈 개수")
+
+    @field_serializer('start_date', 'end_date')
+    def serialize_date(self, value: Optional[date]) -> Optional[str]:
+        """Convert date to ISO string"""
+        return value.isoformat() if value else None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -77,8 +82,13 @@ class SprintListResponse(BaseModel):
     id: int = Field(description="스프린트 ID")
     name: str = Field(description="스프린트 이름")
     status: SprintStatus = Field(description="스프린트 상태")
-    start_date: Optional[str] = Field(default=None, description="시작일 (ISO 8601)")
-    end_date: Optional[str] = Field(default=None, description="종료일 (ISO 8601)")
+    start_date: Optional[date] = Field(default=None, description="시작일 (ISO 8601)")
+    end_date: Optional[date] = Field(default=None, description="종료일 (ISO 8601)")
     issue_count: Optional[int] = Field(default=None, description="이슈 개수")
+
+    @field_serializer('start_date', 'end_date')
+    def serialize_date(self, value: Optional[date]) -> Optional[str]:
+        """Convert date to ISO string"""
+        return value.isoformat() if value else None
 
     model_config = ConfigDict(from_attributes=True)

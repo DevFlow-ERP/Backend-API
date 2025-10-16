@@ -92,6 +92,7 @@ class ProjectListResponse(BaseModel):
     id: int = Field(description="프로젝트 ID")
     name: str = Field(description="프로젝트 이름")
     key: str = Field(description="프로젝트 키")
+    team_id: int = Field(description="팀 ID")
     status: ProjectStatus = Field(description="프로젝트 상태")
     icon_url: Optional[str] = Field(default=None, description="프로젝트 아이콘 URL")
     color: Optional[str] = Field(default=None, description="프로젝트 색상 (HEX)")

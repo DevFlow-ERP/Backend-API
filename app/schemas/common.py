@@ -3,8 +3,9 @@ Common Pydantic schemas
 공통으로 사용되는 스키마를 정의합니다.
 """
 
+from datetime import datetime
 from typing import Generic, TypeVar, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_serializer
 
 
 # Generic type for paginated responses
@@ -38,6 +39,8 @@ class PaginationMeta(BaseModel):
     page: int = Field(description="현재 페이지")
     page_size: int = Field(description="페이지당 항목 수")
     total_pages: int = Field(description="전체 페이지 수")
+    has_next: bool = Field(description="다음 페이지 존재 여부")
+    has_prev: bool = Field(description="이전 페이지 존재 여부")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
@@ -84,7 +87,12 @@ class TimestampSchema(BaseModel):
     타임스탬프 스키마
     created_at, updated_at 필드를 포함하는 기본 스키마입니다.
     """
-    created_at: str = Field(description="생성일시 (ISO 8601)")
-    updated_at: str = Field(description="수정일시 (ISO 8601)")
+    created_at: datetime = Field(description="생성일시 (ISO 8601)")
+    updated_at: datetime = Field(description="수정일시 (ISO 8601)")
+
+    @field_serializer('created_at', 'updated_at')
+    def serialize_datetime(self, value: datetime) -> str:
+        """Convert datetime to ISO 8601 string"""
+        return value.isoformat()
 
     model_config = ConfigDict(from_attributes=True)

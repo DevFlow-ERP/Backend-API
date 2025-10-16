@@ -149,13 +149,7 @@ def update_project(
     if not project:
         raise ProjectNotFoundError(project_id)
 
-    # 프로젝트 키 중복 확인 (키가 변경되는 경우)
-    if project_in.key and project_in.key != project.key:
-        existing_project = crud_project.get_by_key(db, key=project_in.key)
-        if existing_project:
-            raise BadRequestError(f"Project with key '{project_in.key}' already exists")
-
-    # 프로젝트 업데이트
+    # 프로젝트 업데이트 (key는 수정 불가)
     updated_project = crud_project.update(db, db_obj=project, obj_in=project_in)
 
     return updated_project

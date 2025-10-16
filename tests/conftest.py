@@ -11,8 +11,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.database import Base, get_db
-from app.dependencies import get_current_user
+from app.database import Base
+from app.dependencies import get_db, get_current_user
 from app.models.user import User
 from app.core.security import create_access_token
 
@@ -55,6 +55,9 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
     """
     Create a test client with database session override
     """
+    # Clear any existing overrides
+    app.dependency_overrides.clear()
+
     def override_get_db():
         try:
             yield db_session
@@ -66,6 +69,7 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
 
+    # Clear overrides after test
     app.dependency_overrides.clear()
 
 
@@ -168,7 +172,24 @@ def superuser_client(client: TestClient, test_superuser: User) -> TestClient:
 # Test data fixtures
 
 @pytest.fixture(scope="function")
-def sample_project_data() -> dict:
+def test_team(db_session: Session, test_user: User):
+    """
+    Create a test team
+    """
+    from app.models.team import Team
+    team = Team(
+        name="Test Team",
+        slug="test-team",
+        description="A test team",
+    )
+    db_session.add(team)
+    db_session.commit()
+    db_session.refresh(team)
+    return team
+
+
+@pytest.fixture(scope="function")
+def sample_project_data(test_team) -> dict:
     """
     Sample project data for testing
     """
@@ -176,7 +197,7 @@ def sample_project_data() -> dict:
         "key": "TEST",
         "name": "Test Project",
         "description": "A test project",
-        "owner_id": 1,
+        "team_id": test_team.id,
     }
 
 
@@ -205,7 +226,7 @@ def sample_issue_data() -> dict:
         "description": "Test issue description",
         "type": "task",
         "priority": "medium",
-        "reporter_id": 1,
+        "creator_id": 1,
     }
 
 
@@ -260,6 +281,6 @@ def sample_deployment_data() -> dict:
         "environment": "production",
         "type": "manual",
         "status": "pending",
-        "commit_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+        "commit_hash": "abc123def456789abc123def456789abc1234567",
         "branch": "main",
     }

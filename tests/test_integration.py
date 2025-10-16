@@ -24,6 +24,7 @@ class TestProjectWorkflow:
         authenticated_client: TestClient,
         db_session: Session,
         test_user: User,
+        test_team,
     ):
         """
         Test full workflow: Create project → Create sprint → Create issue → Assign to sprint
@@ -33,7 +34,7 @@ class TestProjectWorkflow:
             "key": "TEST",
             "name": "Test Project",
             "description": "Integration test project",
-            "owner_id": test_user.id,
+            "team_id": test_team.id,
         }
         project_response = authenticated_client.post("/api/v1/projects", json=project_data)
         assert project_response.status_code == 201
@@ -60,7 +61,7 @@ class TestProjectWorkflow:
             "description": "Test issue for integration testing",
             "type": "task",
             "priority": "high",
-            "reporter_id": test_user.id,
+            "creator_id": test_user.id,
         }
         issue_response = authenticated_client.post("/api/v1/issues", json=issue_data)
         assert issue_response.status_code == 201
@@ -80,8 +81,8 @@ class TestProjectWorkflow:
         sprint_issues_response = authenticated_client.get(f"/api/v1/issues/sprint/{sprint_id}")
         assert sprint_issues_response.status_code == 200
         sprint_issues = sprint_issues_response.json()
-        assert len(sprint_issues["data"]) == 1
-        assert sprint_issues["data"][0]["id"] == issue_id
+        assert len(sprint_issues["items"]) == 1
+        assert sprint_issues["items"][0]["id"] == issue_id
 
         # 6. Start sprint
         start_response = authenticated_client.post(f"/api/v1/sprints/{sprint_id}/start")
@@ -151,7 +152,7 @@ class TestDeploymentWorkflow:
             "environment": "production",
             "type": "manual",
             "status": "pending",
-            "commit_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+            "commit_hash": "abc123def456789abc123def456789abc1234567",
             "branch": "main",
         }
         deployment1_response = authenticated_client.post("/api/v1/deployments", json=deployment1_data)
@@ -172,7 +173,7 @@ class TestDeploymentWorkflow:
             "environment": "production",
             "type": "manual",
             "status": "pending",
-            "commit_hash": "b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0a1",
+            "commit_hash": "def456abc789def456abc789def456abc7890123",
             "branch": "main",
         }
         deployment2_response = authenticated_client.post("/api/v1/deployments", json=deployment2_data)
@@ -200,7 +201,7 @@ class TestDeploymentWorkflow:
         history_response = authenticated_client.get(f"/api/v1/deployments/service/{service_id}")
         assert history_response.status_code == 200
         history = history_response.json()
-        assert len(history["data"]) == 3  # Three deployments total
+        assert len(history["items"]) == 3  # Three deployments total
 
         # 9. Mark rollback as successful
         rollback_success = authenticated_client.patch(
@@ -212,7 +213,7 @@ class TestDeploymentWorkflow:
         success_list = authenticated_client.get("/api/v1/deployments/status/success")
         assert success_list.status_code == 200
         successful = success_list.json()
-        assert len(successful["data"]) == 2  # Original and rollback
+        assert len(successful["items"]) == 2  # Original and rollback
 
 
 class TestTeamCollaboration:
@@ -231,6 +232,7 @@ class TestTeamCollaboration:
         # 1. Create team
         team_data = {
             "name": "Backend Team",
+            "slug": "backend-team",
             "description": "Backend development team",
         }
         team_response = authenticated_client.post("/api/v1/teams", json=team_data)
@@ -252,13 +254,13 @@ class TestTeamCollaboration:
         members_response = authenticated_client.get(f"/api/v1/teams/{team_id}/members")
         assert members_response.status_code == 200
         members = members_response.json()
-        assert len(members["data"]) == 2  # Owner + added member
+        assert len(members["items"]) == 2  # Owner + added member
 
         # 4. Create project
         project_data = {
             "key": "BACK",
             "name": "Backend Project",
-            "owner_id": test_user.id,
+            "team_id": team_id,
         }
         project_response = authenticated_client.post("/api/v1/projects", json=project_data)
         assert project_response.status_code == 201
@@ -271,7 +273,7 @@ class TestTeamCollaboration:
             "title": "Setup database",
             "type": "task",
             "priority": "high",
-            "reporter_id": test_user.id,
+            "creator_id": test_user.id,
             "assignee_id": test_user.id,
         }
         issue1_response = authenticated_client.post("/api/v1/issues", json=issue1_data)
@@ -282,7 +284,7 @@ class TestTeamCollaboration:
             "title": "Implement API",
             "type": "task",
             "priority": "high",
-            "reporter_id": test_user.id,
+            "creator_id": test_user.id,
             "assignee_id": test_superuser.id,
         }
         issue2_response = authenticated_client.post("/api/v1/issues", json=issue2_data)
@@ -292,7 +294,7 @@ class TestTeamCollaboration:
         my_issues_response = authenticated_client.get("/api/v1/issues/my")
         assert my_issues_response.status_code == 200
         my_issues = my_issues_response.json()
-        assert len(my_issues["data"]) >= 1
+        assert len(my_issues["items"]) >= 1
 
 
 class TestCascadeDeletes:
@@ -303,12 +305,13 @@ class TestCascadeDeletes:
         authenticated_client: TestClient,
         db_session: Session,
         test_user: User,
+        test_team,
     ):
         """
         Test that deleting a project cascades to sprints and issues
         """
         # Create project
-        project = Project(key="TEST", name="Test Project", owner_id=test_user.id)
+        project = Project(key="TEST", name="Test Project", team_id=test_team.id)
         db_session.add(project)
         db_session.commit()
         db_session.refresh(project)
@@ -329,7 +332,7 @@ class TestCascadeDeletes:
             type="task",
             priority="medium",
             status="todo",
-            reporter_id=test_user.id,
+            creator_id=test_user.id,
             key="TEST-1",
         )
         issue2 = Issue(
@@ -339,7 +342,7 @@ class TestCascadeDeletes:
             type="task",
             priority="medium",
             status="todo",
-            reporter_id=test_user.id,
+            creator_id=test_user.id,
             key="TEST-2",
         )
         db_session.add_all([issue1, issue2])
