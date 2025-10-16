@@ -6,7 +6,7 @@ DevFlow ERP 백엔드 애플리케이션
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth
+from app.api.v1 import auth, projects
 from app.config import settings
 
 # FastAPI 앱 생성
@@ -59,6 +59,7 @@ async def readiness_check():
 
 # API 라우터 등록
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(projects.router, prefix="/api/v1")
 
 
 # Root endpoint
