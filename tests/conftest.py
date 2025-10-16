@@ -176,7 +176,8 @@ def test_team(db_session: Session, test_user: User):
     """
     Create a test team
     """
-    from app.models.team import Team
+    from app.models.team import Team, TeamMember, TeamRole
+
     team = Team(
         name="Test Team",
         slug="test-team",
@@ -185,6 +186,16 @@ def test_team(db_session: Session, test_user: User):
     db_session.add(team)
     db_session.commit()
     db_session.refresh(team)
+
+    # Add test_user as owner
+    member = TeamMember(
+        team_id=team.id,
+        user_id=test_user.id,
+        role=TeamRole.OWNER,
+    )
+    db_session.add(member)
+    db_session.commit()
+
     return team
 
 

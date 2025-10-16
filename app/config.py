@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
+    LOG_LEVEL: str = "INFO"
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000"

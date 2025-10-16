@@ -71,7 +71,8 @@ class TestProjectWorkflow:
 
         # 4. Assign issue to sprint
         assign_response = authenticated_client.patch(
-            f"/api/v1/issues/{issue_id}/sprint?sprint_id={sprint_id}"
+            f"/api/v1/issues/{issue_id}/sprint",
+            json={"sprint_id": sprint_id}
         )
         assert assign_response.status_code == 200
         updated_issue = assign_response.json()

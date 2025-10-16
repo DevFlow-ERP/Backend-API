@@ -177,7 +177,7 @@ class CRUDDeployment(CRUDBase[Deployment, DeploymentCreate, DeploymentUpdate]):
         return (
             db.query(Deployment)
             .filter(Deployment.service_id == service_id)
-            .order_by(Deployment.created_at.desc())
+            .order_by(Deployment.created_at.desc(), Deployment.id.desc())
             .first()
         )
 

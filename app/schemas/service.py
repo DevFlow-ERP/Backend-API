@@ -110,6 +110,7 @@ class ServiceListResponse(BaseModel):
     간소화된 서비스 정보 목록입니다.
     """
     id: int = Field(description="서비스 ID")
+    server_id: int = Field(description="서버 ID")
     name: str = Field(description="서비스 이름")
     type: ServiceType = Field(description="서비스 타입")
     status: ServiceStatus = Field(description="서비스 상태")
