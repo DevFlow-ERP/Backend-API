@@ -50,13 +50,13 @@ class Server(Base, TimestampMixin):
 
     # 분류
     type: Mapped[ServerType] = mapped_column(
-        SQLEnum(ServerType, native_enum=False, length=20),
+        SQLEnum(ServerType, native_enum=True, name='servertype', values_callable=lambda x: [e.value for e in x]),
         default=ServerType.VIRTUAL,
         index=True,
         comment="서버 타입"
     )
     status: Mapped[ServerStatus] = mapped_column(
-        SQLEnum(ServerStatus, native_enum=False, length=20),
+        SQLEnum(ServerStatus, native_enum=True, name='serverstatus', values_callable=lambda x: [e.value for e in x]),
         default=ServerStatus.ACTIVE,
         index=True,
         comment="서버 상태"

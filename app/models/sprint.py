@@ -52,7 +52,7 @@ class Sprint(Base, TimestampMixin):
 
     # 상태
     status: Mapped[SprintStatus] = mapped_column(
-        SQLEnum(SprintStatus, native_enum=False, length=20),
+        SQLEnum(SprintStatus, native_enum=True, name='sprint_status', values_callable=lambda x: [e.value for e in x]),
         default=SprintStatus.PLANNED,
         index=True,
         comment="스프린트 상태"

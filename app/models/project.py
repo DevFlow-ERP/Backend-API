@@ -49,7 +49,7 @@ class Project(Base, TimestampMixin):
 
     # 상태
     status: Mapped[ProjectStatus] = mapped_column(
-        SQLEnum(ProjectStatus, native_enum=False, length=20),
+        SQLEnum(ProjectStatus, native_enum=True, name='project_status', values_callable=lambda x: [e.value for e in x]),
         default=ProjectStatus.PLANNING,
         index=True,
         comment="프로젝트 상태"

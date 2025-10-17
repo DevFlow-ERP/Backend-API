@@ -79,19 +79,19 @@ class Issue(Base, TimestampMixin):
 
     # 분류
     type: Mapped[IssueType] = mapped_column(
-        SQLEnum(IssueType, native_enum=False, length=20),
+        SQLEnum(IssueType, native_enum=True, name='issue_type', values_callable=lambda x: [e.value for e in x]),
         default=IssueType.TASK,
         index=True,
         comment="이슈 타입"
     )
     priority: Mapped[IssuePriority] = mapped_column(
-        SQLEnum(IssuePriority, native_enum=False, length=20),
+        SQLEnum(IssuePriority, native_enum=True, name='issue_priority', values_callable=lambda x: [e.value for e in x]),
         default=IssuePriority.MEDIUM,
         index=True,
         comment="우선순위"
     )
     status: Mapped[IssueStatus] = mapped_column(
-        SQLEnum(IssueStatus, native_enum=False, length=20),
+        SQLEnum(IssueStatus, native_enum=True, name='issue_status', values_callable=lambda x: [e.value for e in x]),
         default=IssueStatus.TODO,
         index=True,
         comment="상태"

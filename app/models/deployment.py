@@ -62,12 +62,12 @@ class Deployment(Base, TimestampMixin):
 
     # 배포 타입 및 상태
     type: Mapped[DeploymentType] = mapped_column(
-        SQLEnum(DeploymentType, native_enum=False, length=20),
+        SQLEnum(DeploymentType, native_enum=True, name='deploymenttype', values_callable=lambda x: [e.value for e in x]),
         default=DeploymentType.MANUAL,
         comment="배포 타입"
     )
     status: Mapped[DeploymentStatus] = mapped_column(
-        SQLEnum(DeploymentStatus, native_enum=False, length=20),
+        SQLEnum(DeploymentStatus, native_enum=True, name='deploymentstatus', values_callable=lambda x: [e.value for e in x]),
         default=DeploymentStatus.PENDING,
         index=True,
         comment="배포 상태"

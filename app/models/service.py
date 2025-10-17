@@ -49,13 +49,13 @@ class Service(Base, TimestampMixin):
         comment="서비스 이름"
     )
     type: Mapped[ServiceType] = mapped_column(
-        SQLEnum(ServiceType, native_enum=False, length=20),
+        SQLEnum(ServiceType, native_enum=True, name='servicetype', values_callable=lambda x: [e.value for e in x]),
         default=ServiceType.WEB,
         index=True,
         comment="서비스 타입"
     )
     status: Mapped[ServiceStatus] = mapped_column(
-        SQLEnum(ServiceStatus, native_enum=False, length=20),
+        SQLEnum(ServiceStatus, native_enum=True, name='servicestatus', values_callable=lambda x: [e.value for e in x]),
         default=ServiceStatus.STOPPED,
         index=True,
         comment="서비스 상태"
