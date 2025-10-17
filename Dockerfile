@@ -43,9 +43,9 @@ RUN mkdir -p /app/logs
 # Expose port
 EXPOSE 8000
 
-# Health check
+# Health check using urllib (built-in, no extra dependencies)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)" || exit 1
 
 # Start server (without migrations - handled by init scripts)
 # If you need to run migrations, use: docker compose exec backend alembic upgrade head
