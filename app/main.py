@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
 
-from app.api.v1 import auth, projects, sprints, issues, teams, members, servers, services, deployments
+from app.api.v1 import auth, dashboard, projects, sprints, issues, teams, members, servers, services, deployments
 from app.config import settings
 from app.core.logging import setup_logging, get_logger
 
@@ -53,6 +53,7 @@ JWT 기반 인증을 사용합니다. `/api/v1/auth/token` 엔드포인트에서
     openapi_tags=[
         {"name": "Health", "description": "헬스 체크 및 시스템 상태"},
         {"name": "Authentication", "description": "인증 및 토큰 관리"},
+        {"name": "Dashboard", "description": "대시보드 통계 및 요약 정보"},
         {"name": "Projects", "description": "프로젝트 관리"},
         {"name": "Sprints", "description": "스프린트 관리"},
         {"name": "Issues", "description": "이슈 트래킹"},
@@ -208,6 +209,7 @@ async def readiness_check():
 
 # API 라우터 등록
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(sprints.router, prefix="/api/v1")
 app.include_router(issues.router, prefix="/api/v1")
