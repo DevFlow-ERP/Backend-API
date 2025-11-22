@@ -3,6 +3,7 @@ User CRUD operations
 사용자 관련 CRUD 작업
 """
 
+import uuid
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -12,6 +13,35 @@ from app.schemas.user import UserCreate, UserUpdate
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     """User 모델에 대한 CRUD 작업"""
+
+    def create(self, db: Session, *, obj_in: UserCreate) -> User:
+        """
+        사용자 생성
+        
+        Args:
+            db: 데이터베이스 세션
+            obj_in: 생성할 사용자 정보
+            
+        Returns:
+            User: 생성된 사용자
+        """
+        # Pydantic 모델을 dict로 변환
+        db_obj_data = obj_in.model_dump()
+        
+        # avatar_url 자동 생성
+        if not db_obj_data.get("avatar_url"):
+            db_obj_data["avatar_url"] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={db_obj_data['username']}"
+            
+        # authentik_id 자동 생성 (없을 경우)
+        if not db_obj_data.get("authentik_id"):
+            # 임시로 username과 uuid를 조합하여 생성
+            db_obj_data["authentik_id"] = f"auth-{db_obj_data['username']}-{uuid.uuid4().hex[:8]}"
+            
+        db_obj = User(**db_obj_data)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
 
     def get_by_email(self, db: Session, *, email: str) -> User | None:
         """
