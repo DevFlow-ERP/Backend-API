@@ -81,8 +81,14 @@ class TeamMember(Base, TimestampMixin):
     )
 
     # 역할
+    # [FIX] values_callable 추가: DB의 값('owner')을 Enum 값으로 올바르게 매핑하도록 설정
     role: Mapped[TeamRole] = mapped_column(
-        SQLEnum(TeamRole, native_enum=False, length=20),
+        SQLEnum(
+            TeamRole, 
+            native_enum=False, 
+            length=20, 
+            values_callable=lambda x: [e.value for e in x]
+        ),
         default=TeamRole.MEMBER,
         comment="팀 내 역할"
     )

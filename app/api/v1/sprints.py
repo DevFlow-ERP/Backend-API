@@ -26,6 +26,9 @@ from app.utils import (
     QueryBuilder,
     SortOrder,
 )
+from sqlalchemy import func
+from app.models.issue import Issue, IssueStatus
+
 
 router = APIRouter(prefix="/sprints", tags=["Sprints"])
 
@@ -312,3 +315,51 @@ def get_active_sprint(
         raise NotFoundError(f"No active sprint found for project {project_id}")
 
     return sprint
+
+@router.get("/{sprint_id}/stats")
+def get_sprint_stats(
+    sprint_id: Annotated[int, Path(description="스프린트 ID")],
+    db: DBSession = None,
+    current_user: CurrentUser = None,
+):
+    """
+    스프린트 통계 조회
+    """
+    sprint = crud_sprint.get(db, id=sprint_id)
+    if not sprint:
+        raise NotFoundError(f"Sprint {sprint_id} not found")
+
+    # 전체 이슈 수
+    total_issues = db.query(func.count(Issue.id)).filter(Issue.sprint_id == sprint_id).scalar() or 0
+    
+    # 상태별 이슈 수
+    completed_issues = db.query(func.count(Issue.id)).filter(
+        Issue.sprint_id == sprint_id, 
+        Issue.status.in_([IssueStatus.DONE, IssueStatus.CLOSED])
+    ).scalar() or 0
+
+    in_progress_issues = db.query(func.count(Issue.id)).filter(
+        Issue.sprint_id == sprint_id, 
+        Issue.status.in_([IssueStatus.IN_PROGRESS, IssueStatus.IN_REVIEW, IssueStatus.TESTING])
+    ).scalar() or 0
+
+    todo_issues = db.query(func.count(Issue.id)).filter(
+        Issue.sprint_id == sprint_id, 
+        Issue.status == IssueStatus.TODO
+    ).scalar() or 0
+
+    # 스토리 포인트 (estimate_hours를 스토리 포인트로 가정하거나 별도 컬럼 필요, 여기선 estimate_hours 합계로 대체)
+    total_points = db.query(func.sum(Issue.estimate_hours)).filter(Issue.sprint_id == sprint_id).scalar() or 0
+    completed_points = db.query(func.sum(Issue.estimate_hours)).filter(
+        Issue.sprint_id == sprint_id,
+        Issue.status.in_([IssueStatus.DONE, IssueStatus.CLOSED])
+    ).scalar() or 0
+
+    return {
+        "total_issues": total_issues,
+        "completed_issues": completed_issues,
+        "in_progress_issues": in_progress_issues,
+        "todo_issues": todo_issues,
+        "total_story_points": total_points,
+        "completed_story_points": completed_points
+    }

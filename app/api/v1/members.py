@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Path
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.crud import crud_team_member
 from app.dependencies import CurrentUser, DBSession
@@ -41,16 +41,10 @@ def list_members(
     Get team member list
 
     Returns a list of team members with various filters.
-
-    - **page**: Page number (starting from 1)
-    - **page_size**: Page size (max 100)
-    - **team_id**: Filter by team ID
-    - **user_id**: Filter by user ID
-    - **role**: Filter by role
-    - **sort_by**: Sort field
-    - **order**: Sort order (asc or desc)
     """
-    builder = QueryBuilder(select(TeamMember), TeamMember)
+    # [FIX] joinedload를 사용하여 user 관계를 미리 로드 (N+1 문제 및 로딩 오류 방지)
+    base_query = select(TeamMember).options(joinedload(TeamMember.user))
+    builder = QueryBuilder(base_query, TeamMember)
 
     # Filters
     if team_id:
@@ -81,7 +75,9 @@ def list_my_memberships(
 
     Returns a list of team memberships for the current user.
     """
-    builder = QueryBuilder(select(TeamMember), TeamMember).filter(
+    # [FIX] joinedload 사용
+    base_query = select(TeamMember).options(joinedload(TeamMember.user))
+    builder = QueryBuilder(base_query, TeamMember).filter(
         user_id=current_user.id
     )
     builder.sort("created_at", SortOrder.DESC)
@@ -103,7 +99,13 @@ def get_member(
 
     Returns detailed information about a specific team member.
     """
-    member = crud_team_member.get(db, id=member_id)
+    # [FIX] 명시적 쿼리로 변경하여 joinedload 적용
+    member = db.scalar(
+        select(TeamMember)
+        .options(joinedload(TeamMember.user))
+        .where(TeamMember.id == member_id)
+    )
+    
     if not member:
         raise NotFoundError(f"Member {member_id} not found")
 

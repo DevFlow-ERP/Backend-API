@@ -13,6 +13,8 @@ class Settings(BaseSettings):
         case_sensitive=True
     )
 
+    API_V1_STR: str = "/api/v1"
+    
     # Database
     DATABASE_URL: str
 
