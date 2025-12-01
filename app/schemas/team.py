@@ -3,7 +3,7 @@ Team Pydantic schemas
 팀 및 팀 멤버 관련 스키마를 정의합니다.
 """
 
-from typing import Optional
+from typing import Optional,List
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.team import TeamRole
@@ -18,7 +18,7 @@ class TeamBase(BaseModel):
     """
     name: str = Field(min_length=2, max_length=100, description="팀 이름")
     description: Optional[str] = Field(default=None, max_length=500, description="팀 설명")
-    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9-]+$", description="팀 슬러그 (URL용, 소문자와 하이픈만)")
+    slug: Optional[str] = Field(default=None, description="팀 슬러그 (URL용, 미입력 시 자동 생성)")
 
 
 class TeamCreate(TeamBase):
@@ -27,7 +27,7 @@ class TeamCreate(TeamBase):
     팀 생성 시 필요한 필드를 정의합니다.
     """
     avatar_url: Optional[str] = Field(default=None, max_length=500, description="팀 로고 이미지 URL")
-
+    member_ids: List[int] = Field(default=[], description="초기 추가할 팀원 ID 목록")
 
 class TeamUpdate(BaseModel):
     """
@@ -45,6 +45,7 @@ class TeamResponse(TeamBase, TimestampSchema):
     API 응답으로 반환되는 팀 정보입니다.
     """
     id: int = Field(description="팀 ID")
+    slug: str = Field(description="팀 슬러그")
     avatar_url: Optional[str] = Field(default=None, description="팀 로고 이미지 URL")
     member_count: Optional[int] = Field(default=None, description="팀 멤버 수")
 
@@ -109,5 +110,18 @@ class TeamDetailResponse(TeamResponse):
     팀 정보와 함께 멤버 목록을 포함합니다.
     """
     members: list[TeamMemberResponse] = Field(default_factory=list, description="팀 멤버 목록")
+
+    model_config = ConfigDict(from_attributes=True)
+
+# Backend-API/app/schemas/team.py 파일 하단에 추가
+
+class TeamStatsResponse(BaseModel):
+    """
+    팀 통계 조회 응답 스키마
+    """
+    member_count: int = Field(description="총 팀 멤버 수")
+    project_count: int = Field(description="팀에 속한 총 프로젝트 수")
+    active_sprint_count: int = Field(description="현재 활성화된 스프린트 수")
+    total_issues: int = Field(description="팀에 할당된 총 이슈 수 (전체)")
 
     model_config = ConfigDict(from_attributes=True)

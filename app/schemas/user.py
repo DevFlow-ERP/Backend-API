@@ -25,7 +25,10 @@ class UserCreate(UserBase):
     User 생성 스키마
     사용자 생성 시 필요한 필드를 정의합니다.
     """
-    authentik_id: str = Field(min_length=1, max_length=255, description="Authentik SSO ID")
+    full_name: str = Field(max_length=200, description="전체 이름")
+    phone: str = Field(max_length=20, pattern=r"^\+?[0-9\-\s()]+$", description="전화번호")
+    is_admin: bool = Field(default=False, description="관리자 여부")
+    authentik_id: Optional[str] = Field(default=None, max_length=255, description="Authentik SSO ID")
     avatar_url: Optional[str] = Field(default=None, max_length=500, description="프로필 이미지 URL")
 
 

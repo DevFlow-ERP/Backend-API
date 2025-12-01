@@ -13,8 +13,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../Infra-with-DB/init-scripts:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U devflow"]
+      test: ["CMD-SHELL", "pg_isready -U devflow -d devflow_erp"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,10 +44,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: devflow-backend
+    env_file: .env
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://devflow:devflow_password@postgres:5432/devflow_erp
+      - DATABASE_URL=postgresql+psycopg://devflow:devflow_password@postgres:5432/devflow_erp
       - REDIS_URL=redis://redis:6379/0
       - AUTHENTIK_URL=${AUTHENTIK_URL}
       - AUTHENTIK_TOKEN=${AUTHENTIK_TOKEN}
@@ -54,11 +56,12 @@ services:
       - ENVIRONMENT=development
       - DEBUG=true
       - LOG_LEVEL=DEBUG
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:9000
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
       - ./logs:/app/logs
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy

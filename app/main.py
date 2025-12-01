@@ -10,7 +10,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
 
-from app.api.v1 import auth, dashboard, projects, sprints, issues, teams, members, servers, services, deployments
+# [FIX] 중복 import 제거 및 통합
+from app.api.v1 import (
+    auth, dashboard, projects, sprints, issues, 
+    teams, members, servers, services, deployments, users
+)
 from app.config import settings
 from app.core.logging import setup_logging, get_logger
 
@@ -208,17 +212,18 @@ async def readiness_check():
 
 
 # API 라우터 등록
+# [FIX] 중복 등록 제거 및 정리
 app.include_router(auth.router, prefix="/api/v1")
-app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(teams.router, prefix="/api/v1")
+app.include_router(members.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(sprints.router, prefix="/api/v1")
 app.include_router(issues.router, prefix="/api/v1")
-app.include_router(teams.router, prefix="/api/v1")
-app.include_router(members.router, prefix="/api/v1")
 app.include_router(servers.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
 app.include_router(deployments.router, prefix="/api/v1")
-
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 
 # Root endpoint
 @app.get("/", tags=["Root"])

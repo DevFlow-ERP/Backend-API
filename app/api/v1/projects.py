@@ -6,18 +6,23 @@ Project API endpoints
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Path
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.crud import crud_project
 from app.dependencies import CurrentUser, DBSession
-from app.core.exceptions import ProjectNotFoundError, BadRequestError
+from app.core.exceptions import NotFoundError, BadRequestError
 from app.models.project import Project, ProjectStatus
+from app.models.issue import Issue, IssueStatus
+from app.models.sprint import Sprint, SprintStatus
+from app.models.team import TeamMember
+from app.models.user import User
 from app.schemas.project import (
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,
     ProjectListResponse,
+    ProjectStatsResponse,
 )
 from app.schemas.common import PaginatedResponse, SuccessResponse
 from app.utils import (
@@ -66,7 +71,7 @@ def list_projects(
 
     # 검색
     if search:
-        builder.search(["name", "description"], search)
+        builder.search(["name", "key"], search)
 
     # 정렬
     builder.sort(sort_by, order)
@@ -121,7 +126,7 @@ def get_project(
     """
     project = crud_project.get(db, id=project_id)
     if not project:
-        raise ProjectNotFoundError(project_id)
+        raise NotFoundError(f"Project {project_id} not found")
 
     return project
 
@@ -147,7 +152,7 @@ def update_project(
     # 프로젝트 존재 확인
     project = crud_project.get(db, id=project_id)
     if not project:
-        raise ProjectNotFoundError(project_id)
+        raise NotFoundError(f"Project {project_id} not found")
 
     # 프로젝트 업데이트 (key는 수정 불가)
     updated_project = crud_project.update(db, db_obj=project, obj_in=project_in)
@@ -157,7 +162,7 @@ def update_project(
 
 @router.delete("/{project_id}", response_model=SuccessResponse)
 def delete_project(
-    project_id: Annotated[int, Path(description="프로젝트 ID")],
+    project_id: Annotated[int, Path(description="Project ID")],
     db: DBSession = None,
     current_user: CurrentUser = None,
 ):
@@ -170,7 +175,7 @@ def delete_project(
     # 프로젝트 존재 확인
     project = crud_project.get(db, id=project_id)
     if not project:
-        raise ProjectNotFoundError(project_id)
+        raise NotFoundError(f"Project {project_id} not found")
 
     # 프로젝트 삭제
     crud_project.delete(db, id=project_id)
@@ -181,76 +186,65 @@ def delete_project(
     )
 
 
-@router.get("/key/{project_key}", response_model=ProjectResponse)
-def get_project_by_key(
-    project_key: Annotated[str, Path(description="프로젝트 키")],
+@router.get("/{project_id}/stats", response_model=ProjectStatsResponse)
+def get_project_stats(
+    project_id: Annotated[int, Path(description="Project ID")],
     db: DBSession = None,
     current_user: CurrentUser = None,
 ):
     """
-    프로젝트 키로 조회
-
-    프로젝트 키(예: PROJ, DEV)로 프로젝트를 조회합니다.
+    Get project statistics
     """
-    project = crud_project.get_by_key(db, key=project_key)
-    if not project:
-        raise ProjectNotFoundError(f"Project with key '{project_key}' not found")
-
-    return project
-
-
-@router.patch("/{project_id}/status", response_model=ProjectResponse)
-def update_project_status(
-    project_id: Annotated[int, Path(description="프로젝트 ID")],
-    status: Annotated[ProjectStatus, Query(description="새로운 프로젝트 상태")],
-    db: DBSession = None,
-    current_user: CurrentUser = None,
-):
-    """
-    프로젝트 상태 변경
-
-    프로젝트의 상태만 변경합니다.
-
-    **상태 종류**:
-    - **PLANNING**: 계획 중
-    - **ACTIVE**: 진행 중
-    - **ON_HOLD**: 보류
-    - **COMPLETED**: 완료
-    - **ARCHIVED**: 보관
-    """
-    # 프로젝트 존재 확인
+    # 1. 프로젝트 존재 확인
     project = crud_project.get(db, id=project_id)
     if not project:
-        raise ProjectNotFoundError(project_id)
+        raise NotFoundError(f"Project {project_id} not found")
 
-    # 상태 변경
-    updated_project = crud_project.update_status(db, project_id=project_id, status=status)
+    # 2. [Total Issues] 총 이슈 수 계산
+    total_issues = db.scalar(
+        select(func.count(Issue.id))
+        .where(Issue.project_id == project_id)
+    ) or 0
 
-    return updated_project
+    # 3. [Completed Issues] 완료된 이슈 수 계산
+    completed_issues = db.scalar(
+        select(func.count(Issue.id))
+        .where(
+            Issue.project_id == project_id,
+            Issue.status.in_([IssueStatus.DONE, IssueStatus.CLOSED])
+        )
+    ) or 0
+    
+    # 4. [Open Issues] 열린 이슈 수 계산 (전체 - 완료)
+    open_issues = total_issues - completed_issues
 
+    # 5. [Total Sprints] 총 스프린트 수 계산
+    # (주의: active_sprints가 있으면 total_sprints는 무조건 그보다 크거나 같아야 함)
+    total_sprints = db.scalar(
+        select(func.count(Sprint.id))
+        .where(Sprint.project_id == project_id)
+    ) or 0
 
-@router.get("/team/{team_id}", response_model=PaginatedResponse[ProjectListResponse])
-def list_team_projects(
-    team_id: Annotated[int, Path(description="팀 ID")],
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
-    status: ProjectStatus | None = Query(default=None),
-    db: DBSession = None,
-    current_user: CurrentUser = None,
-):
-    """
-    팀의 프로젝트 목록 조회
+    # 6. [Active Sprints] 활성 스프린트 수 계산
+    active_sprints = db.scalar(
+        select(func.count(Sprint.id))
+        .where(
+            Sprint.project_id == project_id,
+            Sprint.status == SprintStatus.ACTIVE
+        )
+    ) or 0
 
-    특정 팀에 속한 프로젝트 목록을 조회합니다.
-    """
-    builder = QueryBuilder(select(Project), Project).filter(team_id=team_id)
+    # 7. [Team Members] 팀 멤버 수 계산
+    team_members = db.scalar(
+        select(func.count(TeamMember.id))
+        .where(TeamMember.team_id == project.team_id)
+    ) or 0
 
-    if status:
-        builder.filter(status=status)
-
-    builder.sort("created_at", SortOrder.DESC)
-
-    query = builder.build()
-    items, meta = paginate(db, query, page=page, page_size=page_size)
-
-    return create_paginated_response(items, meta)
+    return ProjectStatsResponse(
+        total_sprints=total_sprints,
+        active_sprints=active_sprints,
+        total_issues=total_issues,
+        open_issues=open_issues,
+        completed_issues=completed_issues,
+        team_members=team_members,
+    )

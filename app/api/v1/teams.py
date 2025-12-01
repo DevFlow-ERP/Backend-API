@@ -2,17 +2,20 @@
 Team API endpoints
 Team management API
 """
+import re
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Path, Body
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.crud import crud_team, crud_user
 from app.dependencies import CurrentUser, DBSession
 from app.core.exceptions import NotFoundError, BadRequestError
 from app.models.team import Team, TeamMember, TeamRole
+from app.models.project import Project
+from app.models.user import User
 from app.schemas.team import (
     TeamCreate,
     TeamUpdate,
@@ -22,6 +25,7 @@ from app.schemas.team import (
     TeamMemberCreate,
     TeamMemberUpdate,
     TeamMemberResponse,
+    TeamStatsResponse,
 )
 from app.schemas.common import PaginatedResponse, SuccessResponse
 from app.utils import (
@@ -30,6 +34,8 @@ from app.utils import (
     QueryBuilder,
     SortOrder,
 )
+
+
 
 router = APIRouter(prefix="/teams", tags=["Teams"])
 
@@ -46,12 +52,6 @@ def list_teams(
 ):
     """
     Get team list
-
-    - **page**: Page number (starting from 1)
-    - **page_size**: Page size (max 100)
-    - **search**: Search in team name
-    - **sort_by**: Sort field
-    - **order**: Sort order (asc or desc)
     """
     builder = QueryBuilder(select(Team), Team)
 
@@ -73,6 +73,15 @@ def list_teams(
 
     return create_paginated_response(items, meta)
 
+def create_slug(name: str) -> str:
+    """
+    팀 이름으로 슬러그 생성
+    소문자, 숫자, 하이픈만 허용
+    """
+    slug = name.lower()
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    slug = slug.strip('-')
+    return slug
 
 @router.post("", response_model=TeamResponse, status_code=201)
 def create_team(
@@ -82,24 +91,18 @@ def create_team(
 ):
     """
     Create a new team
-
-    Creates a new team and automatically adds the creator as owner.
-
-    **Required fields**:
-    - **name**: Team name
-    - **slug**: Team slug (URL-friendly, lowercase with hyphens only)
-
-    **Optional fields**:
-    - **description**: Team description
-    - **avatar_url**: Team logo image URL
     """
     # Check if team with same name exists
     existing_team = crud_team.get_by_name(db, name=team_in.name)
     if existing_team:
         raise BadRequestError(f"Team with name '{team_in.name}' already exists")
+    
+    if not team_in.slug:
+        team_in.slug = create_slug(team_in.name)
 
+    team_data = team_in.model_dump(exclude={"member_ids"})
     # Create team
-    team = crud_team.create(db, obj_in=team_in)
+    team = crud_team.create(db, obj_in=team_data)
 
     # Add creator as owner
     crud_team.add_member(
@@ -108,11 +111,31 @@ def create_team(
         user_id=current_user.id,
         role=TeamRole.OWNER
     )
+    # 4. [추가] 선택된 초기 멤버들을 MEMBER로 추가
+    if team_in.member_ids:
+        for user_id in team_in.member_ids:
+            # 본인을 중복 추가하지 않도록 체크
+            if user_id == current_user.id:
+                continue
+                
+            # 사용자 존재 여부 확인 (선택 사항: 생략 시 FK 에러 발생 가능)
+            user = crud_user.get(db, id=user_id)
+            if user:
+                # 이미 멤버인지 확인 (새 팀이라 없겠지만 방어 코드)
+                if not crud_team.is_member(db, team_id=team.id, user_id=user_id):
+                    crud_team.add_member(
+                        db,
+                        team_id=team.id,
+                        user_id=user_id,
+                        role=TeamRole.MEMBER
+                    )
 
     # Add member count
-    team.member_count = 1
+        team.member_count = db.query(func.count(TeamMember.id)).filter(
+        TeamMember.team_id == team.id
+        ).scalar() or 0
 
-    return team
+        return team
 
 
 @router.get("/my", response_model=PaginatedResponse[TeamListResponse])
@@ -124,8 +147,6 @@ def list_my_teams(
 ):
     """
     Get teams I belong to
-
-    Returns a list of teams that the current user is a member of.
     """
     # Get teams for current user
     teams = crud_team.get_user_teams(
@@ -171,10 +192,19 @@ def get_team(
 ):
     """
     Get team details
-
-    Returns detailed information about a specific team including member list.
     """
-    team = crud_team.get(db, id=team_id)
+    # [수정됨] joinedload 사용 시 .unique() 필수 호출
+    stmt = (
+        select(Team)
+        .options(
+            joinedload(Team.members).joinedload(TeamMember.user)
+        )
+        .where(Team.id == team_id)
+    )
+    
+    # execute() 후 unique()를 호출해야 1:N 관계 중복 데이터가 병합됩니다.
+    team = db.execute(stmt).unique().scalar_one_or_none()
+
     if not team:
         raise NotFoundError(f"Team {team_id} not found")
 
@@ -182,7 +212,6 @@ def get_team(
     team.member_count = len(team.members)
 
     return team
-
 
 @router.put("/{team_id}", response_model=TeamResponse)
 def update_team(
@@ -193,13 +222,6 @@ def update_team(
 ):
     """
     Update team information
-
-    Updates team information. Only provided fields will be updated.
-
-    **Updatable fields**:
-    - **name**: Team name
-    - **description**: Team description
-    - **avatar_url**: Team logo image URL
     """
     # Check if team exists
     team = crud_team.get(db, id=team_id)
@@ -230,8 +252,6 @@ def delete_team(
 ):
     """
     Delete a team
-
-    Deletes a team. Only team owners can delete teams.
     """
     # Check if team exists
     team = crud_team.get(db, id=team_id)
@@ -264,8 +284,6 @@ def list_team_members(
 ):
     """
     Get team member list
-
-    Returns a list of members in the specified team.
     """
     # Check if team exists
     team = crud_team.get(db, id=team_id)
@@ -273,7 +291,10 @@ def list_team_members(
         raise NotFoundError(f"Team {team_id} not found")
 
     # Build query
-    builder = QueryBuilder(select(TeamMember), TeamMember).filter(team_id=team_id)
+    # [수정됨] joinedload를 명확한 select 구문에 적용
+    base_query = select(TeamMember).options(joinedload(TeamMember.user)).filter(TeamMember.team_id == team_id)
+    
+    builder = QueryBuilder(base_query, TeamMember)
 
     if role:
         builder.filter(role=role)
@@ -295,20 +316,6 @@ def add_team_member(
 ):
     """
     Add a member to the team
-
-    Adds a new member to the team with the specified role.
-
-    **Required fields**:
-    - **user_id**: User ID to add
-
-    **Optional fields**:
-    - **role**: Team role (default: MEMBER)
-
-    **Roles**:
-    - **OWNER**: Team owner (full control)
-    - **ADMIN**: Team admin (can manage members)
-    - **MEMBER**: Regular member
-    - **VIEWER**: Read-only access
     """
     # Check if team exists
     team = crud_team.get(db, id=team_id)
@@ -349,8 +356,6 @@ def remove_team_member(
 ):
     """
     Remove a member from the team
-
-    Removes a member from the team. Owners and admins can remove members.
     """
     # Check if team exists
     team = crud_team.get(db, id=team_id)
@@ -389,14 +394,6 @@ def update_member_role(
 ):
     """
     Update team member role
-
-    Updates the role of a team member. Only owners can change roles.
-
-    **Roles**:
-    - **OWNER**: Team owner (full control)
-    - **ADMIN**: Team admin (can manage members)
-    - **MEMBER**: Regular member
-    - **VIEWER**: Read-only access
     """
     # Check if team exists
     team = crud_team.get(db, id=team_id)
@@ -420,3 +417,46 @@ def update_member_role(
     )
 
     return team_member
+
+@router.get("/{team_id}/stats", response_model=TeamStatsResponse)
+def get_team_stats(
+    team_id: Annotated[int, Path(description="Team ID")],
+    db: DBSession,
+    current_user: CurrentUser,
+):
+    """
+    팀 관련 통계 조회
+    """
+    team = crud_team.get(db, id=team_id)
+    if not team:
+        raise NotFoundError(f"Team {team_id} not found")
+
+    # 멤버 수
+    member_count = db.query(func.count(TeamMember.id)).filter(
+        TeamMember.team_id == team_id
+    ).scalar() or 0
+
+    # 프로젝트 수
+    project_count = db.query(func.count(Project.id)).filter(
+        Project.team_id == team_id
+    ).scalar() or 0
+
+    # [FIX] 활성 스프린트 수 (팀 내 모든 프로젝트의 활성 스프린트 합계)
+    from app.models.sprint import Sprint, SprintStatus
+    active_sprint_count = db.query(func.count(Sprint.id)).join(Project).filter(
+        Project.team_id == team_id,
+        Sprint.status == SprintStatus.ACTIVE
+    ).scalar() or 0
+
+    # [FIX] 전체 이슈 수 (팀 내 모든 프로젝트의 이슈 합계)
+    from app.models.issue import Issue
+    total_issues = db.query(func.count(Issue.id)).join(Project).filter(
+        Project.team_id == team_id
+    ).scalar() or 0
+    
+    return TeamStatsResponse(
+        member_count=member_count,
+        project_count=project_count,
+        active_sprint_count=active_sprint_count,
+        total_issues=total_issues,
+    )

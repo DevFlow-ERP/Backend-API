@@ -98,3 +98,17 @@ class ProjectListResponse(BaseModel):
     color: Optional[str] = Field(default=None, description="프로젝트 색상 (HEX)")
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectStatsResponse(BaseModel):
+    """
+    프로젝트 통계 응답 스키마
+    """
+    total_sprints: int = Field(default=0)
+    active_sprints: int = Field(default=0)
+    total_issues: int = Field(default=0)
+    open_issues: int = Field(default=0)
+    completed_issues: int = Field(default=0)
+    team_members: int = Field(default=0)
+
+    model_config = ConfigDict(from_attributes=True)
